@@ -150,28 +150,28 @@ jobs:
         run: docker build -t ${{ matrix.image }}:${{ github.sha }} --target ${{ matrix.target }} -f ${{ matrix.dockerfile }} ${{ matrix.path }}
       - name: Deploy Kubernetes
         run: |
-          kind create cluster --name ${{ github.job }} --kubeconfig kube-${{ github.job }} --wait 1m
+          kind create cluster --name ${{ github.run_id }} --kubeconfig kube-${{ github.run_id }} --wait 1m
       - name: Cluster IP
         id: get_cluster
         run: |
-          echo ::set-output name=CLUSTER_IP::$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${{ github.job }}-control-plane)
+          echo ::set-output name=CLUSTER_IP::$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${{ github.run_id }}-control-plane)
       - name: Push Docker Image
         run: |
-          kind load docker-image ${{ matrix.image }}:${{ github.sha }} --name ${{ github.job }}
+          kind load docker-image ${{ matrix.image }}:${{ github.sha }} --name ${{ github.run_id }}
       - name: Run Smoke Tests
         run: |
-            cd tests && touch tests-${{ matrix.image }}-${{ github.job }}.xml
+            cd tests && touch tests-${{ matrix.image }}-${{ github.run_id }}.xml
             docker run --rm \
-            --name test-runner-${{ github.job }} \
-            -v $(pwd)/tests/tests-${{ matrix.image }}-${{ github.job }}.xml:/workspace/tests/tests-${{ matrix.image }}-${{ github.job }}.xml \
-            -v $(pwd)/kube-${{ github.job }}:/root/.kube/config test-runner:${GIT_COMMIT} \
-            --context=kind-${{ github.job }} \
+            --name test-runner-${{ github.run_id }} \
+            -v ${{ github.workspace }}/tests/tests-${{ matrix.image }}-${{ github.run_id }}.xml:/workspace/tests/tests-${{ matrix.image }}-${{ github.run_id }}.xml \
+            -v ${{ github.workspace }}/kube-${{ github.run_id }}:/root/.kube/config test-runner:${{ github.sha }} \
+            --context=kind-${{ github.run_id }} \
             --image=${{ matrix.image }}:${{ github.sha }} \
             --image-pull-policy=IfNotPresent --ic-type=${{ matrix.image }} \
             --service=nodeport --node-ip=${{ steps.get_cluster.outputs.CLUSTER_IP }} \
-            --junitxml=tests-${{ matrix.image }}-${{ github.job }}.xml
+            --junitxml=tests-${{ matrix.image }}-${{ github.run_id }}.xml
       - name: Upload Test Results
         uses: actions/upload-artifact@v2
         with:
           name: test-results-${{ matrix.image }}
-          path: ${{ github.workspace }}/tests/tests-${{ matrix.image }}-${{ github.job }}.xml
+          path: ${{ github.workspace }}/tests/tests-${{ matrix.image }}-${{ github.run_id }}.xml
