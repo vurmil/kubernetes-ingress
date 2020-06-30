@@ -25,7 +25,7 @@ jobs:
       - name: Build Binary
         run: make binary BUILD_IN_CONTAINER=0
         env:
-          GOFLAGS: "-mod=vendor -gcflags=-trimpath=${{ github.workspace }} -asmflags=-trimpath=${{ github.workspace }}"
+          GOFLAGS: '-mod=vendor -gcflags=-trimpath=${{ github.workspace }} -asmflags=-trimpath=${{ github.workspace }}'
       - name: Upload Binary
         uses: actions/upload-artifact@v2
         with:
@@ -96,6 +96,7 @@ jobs:
           name: nginx-ingress
           path: ${{ github.workspace }}/nginx-ingress
       - name: Fetch Certificates
+        if: contains(matrix.image, 'plus')
         env:
           CRT: ${{ secrets.NGINX_CRT }}
           KEY: ${{ secrets.NGINX_KEY }}
@@ -137,6 +138,14 @@ jobs:
         with:
           name: nginx-ingress
           path: ${{ github.workspace }}/nginx-ingress
+      - name: Fetch Certificates
+        if: contains(matrix.image, 'plus')
+        env:
+          CRT: ${{ secrets.NGINX_CRT }}
+          KEY: ${{ secrets.NGINX_KEY }}
+        run: |
+          echo "${CRT}" | base64 --decode > nginx-repo.crt
+          echo "${KEY}" | base64 --decode > nginx-repo.key
       - name: Build NGINX Container
         run: docker build -t ${{ matrix.image }}:${{ github.sha }} --target ${{ matrix.target }} -f ${{ matrix.dockerfile }} ${{ matrix.path }}
       - name: Deploy Kubernetes
