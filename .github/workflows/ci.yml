@@ -1,0 +1,168 @@
+name: Continuous Integration
+
+on:
+  push:
+    branches:
+      - '**'
+  pull_request:
+    branches:
+      - master
+  schedule:
+    - cron:  '* 4 * * *'
+
+env:
+  DOCKER_BUILDKIT: 1
+  GOLANG_VERSION: 1.14
+
+jobs:
+
+  binary:
+    name: Build Binary
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+      - name: Build Binary
+        run: make binary BUILD_IN_CONTAINER=0
+        env:
+          GOFLAGS: "-mod=vendor -gcflags=-trimpath=${{ github.workspace }} -asmflags=-trimpath=${{ github.workspace }}"
+      - name: Upload Binary
+        uses: actions/upload-artifact@v2
+        with:
+          name: nginx-ingress
+          path: ${{ github.workspace }}/nginx-ingress
+
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-18.04
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+      - name: Setup Golang Environment
+        uses: actions/setup-go@v2
+        with:
+          go-version: '${{ env.GOLANG_VERSION }}'
+      - name: Run Tests
+        run: make test
+
+  build:
+    name: Build Docker Images
+    runs-on: ${{ matrix.os }}
+    needs: [binary]
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-18.04
+            dockerfile: build/Dockerfile
+            path: '.'
+            target: local
+            image: nginx-ingress
+          - os: ubuntu-18.04
+            dockerfile: build/DockerfileForAlpine
+            path: '.'
+            target: local
+            image: nginx-ingress-alpine
+          - os: ubuntu-18.04
+            dockerfile: build/DockerfileForPlus
+            path: '.'
+            target: local
+            image: nginx-plus-ingress
+          - os: ubuntu-18.04
+            dockerfile: build/DockerfileWithOpentracing
+            path: '.'
+            target: local
+            image: nginx-ingress-opentracing
+          - os: ubuntu-18.04
+            dockerfile: build/DockerfileWithOpentracingForPlus
+            path: '.'
+            target: local
+            image: nginx-plus-ingress-opentracing
+          - os: ubuntu-18.04
+            dockerfile: build/openshift/Dockerfile
+            path: '.'
+            target: local
+            image: nginx-ingress-openshift
+          - os: ubuntu-18.04
+            dockerfile: build/openshift/DockerfileForPlus
+            path: '.'
+            target: local
+            image: nginx-plus-ingress-openshift
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+      - name: Retrieve Binary
+        uses: actions/download-artifact@v2
+        with:
+          name: nginx-ingress
+          path: ${{ github.workspace }}/nginx-ingress
+      - name: Fetch Certificates
+        env:
+          CRT: ${{ secrets.NGINX_CRT }}
+          KEY: ${{ secrets.NGINX_KEY }}
+        run: |
+          echo "${CRT}" | base64 --decode > nginx-repo.crt
+          echo "${KEY}" | base64 --decode > nginx-repo.key
+      - name: Build Docker Image ${{ matrix.dockerfiles }}
+        uses: docker/build-push-action@v1
+        with:
+          repository: ${{ matrix.image }}
+          dockerfile: ${{ matrix.dockerfile }}
+          path: ${{ matrix.path }}
+          target: ${{ matrix.target }}
+          tag_with_sha: true
+          push: false
+
+  smoke-tests-nginx:
+    name: Smoke Tests
+    runs-on: ${{ matrix.os }}
+    needs: [build, binary, unit-tests]
+    strategy:
+      matrix:
+        include:
+          - os: ubuntu-18.04
+            dockerfile: build/Dockerfile
+            path: '.'
+            target: local
+            image: nginx-ingress
+          - os: ubuntu-18.04
+            dockerfile: build/DockerfileForPlus
+            path: '.'
+            target: local
+            image: nginx-plus-ingress
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+      - name: Retrieve Binary
+        uses: actions/download-artifact@v2
+        with:
+          name: nginx-ingress
+          path: ${{ github.workspace }}/nginx-ingress
+      - name: Build NGINX Container
+        run: docker build -t ${{ matrix.image }}:${{ github.sha }} --target ${{ matrix.target }} -f ${{ matrix.dockerfile }} ${{ matrix.path }}
+      - name: Deploy Kubernetes
+        run: |
+          kind create cluster --name ${{ github.job }} --kubeconfig kube-${{ github.job }} --wait 1m
+      - name: Cluster IP
+        id: get_cluster
+        run: |
+          run: echo ::set-output name=CLUSTER_IP::$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${{ github.job }}-control-plane)
+      - name: Push Docker Image
+        run: |
+          kind load docker-image ${{ matrix.image }}:${{ github.sha }} --name ${{ github.job }}
+      - name: Run Smoke Tests
+        run: |
+            cd tests && touch tests-${{ matrix.image }}-${{ github.job }}.xml
+            docker run --rm \
+            --name test-runner-${{ github.job }} \
+            -v $(pwd)/tests/tests-${{ matrix.image }}-${{ github.job }}.xml:/workspace/tests/tests-${{ matrix.image }}-${{ github.job }}.xml \
+            -v $(pwd)/kube-${{ github.job }}:/root/.kube/config test-runner:${GIT_COMMIT} \
+            --context=kind-${{ github.job }} \
+            --image=${{ matrix.image }}:${{ github.sha }} \
+            --image-pull-policy=IfNotPresent --ic-type=${{ matrix.image }} \
+            --service=nodeport --node-ip=${{ steps.get_cluster.outputs.CLUSTER_IP }} \
+            --junitxml=tests-${{ matrix.image }}-${{ github.job }}.xml
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v2
+        with:
+          name: test-results-${{ matrix.image }}
+          path: ${{ github.workspace }}/tests/tests-${{ matrix.image }}-${{ github.job }}.xml
