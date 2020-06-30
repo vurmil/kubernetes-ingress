@@ -146,6 +146,8 @@ jobs:
         run: |
           echo "${CRT}" | base64 --decode > nginx-repo.crt
           echo "${KEY}" | base64 --decode > nginx-repo.key
+      - name: Build Test Container
+        run: docker build -t test-runner:${{ github.sha }} -f tests/docker/Dockerfile .
       - name: Build NGINX Container
         run: docker build -t ${{ matrix.image }}:${{ github.sha }} --target ${{ matrix.target }} -f ${{ matrix.dockerfile }} ${{ matrix.path }}
       - name: Deploy Kubernetes
