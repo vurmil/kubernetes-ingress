@@ -154,7 +154,7 @@ jobs:
       - name: Cluster IP
         id: get_cluster
         run: |
-          run: echo ::set-output name=CLUSTER_IP::$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${{ github.job }}-control-plane)
+          echo ::set-output name=CLUSTER_IP::$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${{ github.job }}-control-plane)
       - name: Push Docker Image
         run: |
           kind load docker-image ${{ matrix.image }}:${{ github.sha }} --name ${{ github.job }}
