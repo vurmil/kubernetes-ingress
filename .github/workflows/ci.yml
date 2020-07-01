@@ -157,26 +157,29 @@ jobs:
         id: get_cluster
         run: |
           echo ::set-output name=cluster_ip::$(docker inspect -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' ${{ github.run_id }}-control-plane)
+          echo ::set-output name=cluster::$(echo '${{ matrix.image }}-${{ github.run_id }}')
       - name: Setup Kubeconfig
         run: |
           sed -i 's|server:.*|server: https://${{ steps.get_cluster.outputs.cluster_ip }}:6443|' kube-${{ github.run_id }}
+          cat kube-${{ github.run_id }}
+          docker ps
       - name: Push Docker Image
         run: |
           kind load docker-image ${{ matrix.image }}:${{ github.sha }} --name ${{ github.run_id }}
       - name: Run Smoke Tests
         run: |
-            cd tests && touch tests-${{ matrix.image }}-${{ github.run_id }}.xml
+            cd tests && touch tests-${{ steps.get_cluster.outputs.cluster }}.xml
             docker run --rm \
             --name test-runner-${{ github.run_id }} \
-            -v ${{ github.workspace }}/tests/tests-${{ matrix.image }}-${{ github.run_id }}.xml:/workspace/tests/tests-${{ matrix.image }}-${{ github.run_id }}.xml \
+            -v ${{ github.workspace }}/tests/tests-${{ steps.get_cluster.outputs.cluster }}.xml:/workspace/tests/tests-${{ steps.get_cluster.outputs.cluster }}.xml \
             -v ${{ github.workspace }}/kube-${{ github.run_id }}:/root/.kube/config test-runner:${{ github.sha }} \
             --context=kind-${{ github.run_id }} \
             --image=${{ matrix.image }}:${{ github.sha }} \
             --image-pull-policy=IfNotPresent --ic-type=${{ matrix.image }} \
             --service=nodeport --node-ip=${{ steps.get_cluster.outputs.cluster_ip }} \
-            --junitxml=tests-${{ matrix.image }}-${{ github.run_id }}.xml
+            --junitxml=tests-${{ steps.get_cluster.outputs.cluster }}.xml
       - name: Upload Test Results
         uses: actions/upload-artifact@v2
         with:
           name: test-results-${{ matrix.image }}
-          path: ${{ github.workspace }}/tests/tests-${{ matrix.image }}-${{ github.run_id }}.xml
+          path: ${{ github.workspace }}/tests/tests-${{ steps.get_cluster.outputs.cluster }}.xml
