@@ -179,7 +179,7 @@ jobs:
       - name: Run Smoke Tests
         run: |
             cd tests && touch tests-${{ steps.get_cluster.outputs.cluster }}.xml
-            pip install -r requirements.txt
+            pip3 install -r requirements.txt
             python3 -m pytest \
             --context=kind-${{ github.run_id }} \
             --image=${{ matrix.image }}:${{ github.sha }} \
