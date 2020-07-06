@@ -183,14 +183,17 @@ jobs:
       #       --junitxml=tests-${{ steps.get_cluster.outputs.cluster }}.xml
       - name: Run Smoke Tests
         run: |
-            cd tests && touch tests-${{ steps.get_cluster.outputs.cluster }}.xml
-            pip install -r requirements.txt
-            python -m pytest \
-            --context=kind-${{ github.run_id }} \
-            --image=${{ matrix.image }}:${{ github.sha }} \
-            --image-pull-policy=IfNotPresent --ic-type=${{ matrix.image }} \
-            --service=nodeport --node-ip=127.0.0.1 \
-            --junitxml=tests-${{ steps.get_cluster.outputs.cluster }}.xml
+          python --version
+          cat kube-${{ github.run_id }}
+          kubectl get nodes --kubeconfig kube-${{ github.run_id }}
+          cd tests && touch tests-${{ steps.get_cluster.outputs.cluster }}.xml
+          pip install -r requirements.txt
+          python -m pytest \
+          --context=kind-${{ github.run_id }} \
+          --image=${{ matrix.image }}:${{ github.sha }} \
+          --image-pull-policy=IfNotPresent --ic-type=${{ matrix.image }} \
+          --service=nodeport --node-ip=127.0.0.1 \
+          --junitxml=tests-${{ steps.get_cluster.outputs.cluster }}.xml
       - name: Upload Test Results
         uses: actions/upload-artifact@v2
         with:
