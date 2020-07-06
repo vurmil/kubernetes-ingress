@@ -165,6 +165,7 @@ jobs:
       - name: Push Docker Image
         run: |
           kind load docker-image ${{ matrix.image }}:${{ github.sha }} --name ${{ github.run_id }}
+          docker exec -it ${{ github.run_id }}-control-plane crictl images
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
@@ -183,15 +184,15 @@ jobs:
       #       --junitxml=tests-${{ steps.get_cluster.outputs.cluster }}.xml
       - name: Run Smoke Tests
         run: |
-          kubectl get nodes
-          cd tests && touch tests-${{ steps.get_cluster.outputs.cluster }}.xml
           pip install -r requirements.txt
+          touch tests-${{ steps.get_cluster.outputs.cluster }}.xml
           python -m pytest \
           --context=kind-${{ github.run_id }} \
           --image=${{ matrix.image }}:${{ github.sha }} \
           --image-pull-policy=IfNotPresent --ic-type=${{ matrix.image }} \
           --service=nodeport --node-ip=127.0.0.1 \
           --junitxml=tests-${{ steps.get_cluster.outputs.cluster }}.xml
+        working-directory: ./tests
       - name: Upload Test Results
         uses: actions/upload-artifact@v2
         with:
