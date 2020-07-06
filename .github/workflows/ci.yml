@@ -13,6 +13,7 @@ on:
 env:
   DOCKER_BUILDKIT: 1
   GOLANG_VERSION: 1.14
+  PYTHON_VERSION: 3.8
 
 jobs:
 
@@ -164,6 +165,10 @@ jobs:
       - name: Push Docker Image
         run: |
           kind load docker-image ${{ matrix.image }}:${{ github.sha }} --name ${{ github.run_id }}
+      - name: Set up Python
+        uses: actions/setup-python@v2
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
       # - name: Run Smoke Tests
       #   run: |
       #       cd tests && touch tests-${{ steps.get_cluster.outputs.cluster }}.xml
@@ -179,8 +184,8 @@ jobs:
       - name: Run Smoke Tests
         run: |
             cd tests && touch tests-${{ steps.get_cluster.outputs.cluster }}.xml
-            pip3 install -r requirements.txt
-            python3 -m pytest \
+            pip install -r requirements.txt
+            python -m pytest \
             --context=kind-${{ github.run_id }} \
             --image=${{ matrix.image }}:${{ github.sha }} \
             --image-pull-policy=IfNotPresent --ic-type=${{ matrix.image }} \
