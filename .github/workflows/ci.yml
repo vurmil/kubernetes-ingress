@@ -44,9 +44,7 @@ jobs:
         with:
           go-version: '${{ env.GOLANG_VERSION }}'
       - name: Run Tests
-        run: |
-          go version
-          go test ./...
+        run: go test ./...
 
   build:
     name: Build Docker Images
@@ -167,7 +165,6 @@ jobs:
       - name: Push Docker Image
         run: |
           kind load docker-image ${{ matrix.image }}:${{ github.sha }} --name ${{ github.run_id }}
-          docker exec -it ${{ github.run_id }}-control-plane crictl images
       - name: Set up Python
         uses: actions/setup-python@v2
         with:
@@ -189,10 +186,10 @@ jobs:
           pip install -r requirements.txt
           touch tests-${{ steps.get_cluster.outputs.cluster }}.xml
           python -m pytest \
-          --context=kind-${{ github.run_id }} \
+          # --context=kind-${{ github.run_id }} \
           --image=${{ matrix.image }}:${{ github.sha }} \
-          --image-pull-policy=IfNotPresent --ic-type=${{ matrix.image }} \
-          --service=nodeport --node-ip=127.0.0.1 \
+          --ic-type=${{ matrix.image }} \
+          --service=nodeport \
           --junitxml=tests-${{ steps.get_cluster.outputs.cluster }}.xml
         working-directory: ./tests
       - name: Upload Test Results
