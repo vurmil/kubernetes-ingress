@@ -185,11 +185,11 @@ jobs:
         run: |
           pip install -r requirements.txt
           touch tests-${{ steps.get_cluster.outputs.cluster }}.xml
-          python -m pytest \
-          # --context=kind-${{ github.run_id }} \
+          python -m pytest -m smoke \
+          --context=kind-${{ github.run_id }} \
           --image=${{ matrix.image }}:${{ github.sha }} \
           --ic-type=${{ matrix.image }} \
-          --service=nodeport \
+          --service=nodeport --node-ip=127.0.0.1 \
           --junitxml=tests-${{ steps.get_cluster.outputs.cluster }}.xml
         working-directory: ./tests
       - name: Upload Test Results
