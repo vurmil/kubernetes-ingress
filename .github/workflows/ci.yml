@@ -183,8 +183,6 @@ jobs:
       #       --junitxml=tests-${{ steps.get_cluster.outputs.cluster }}.xml
       - name: Run Smoke Tests
         run: |
-          python --version
-          cat kube-${{ github.run_id }}
           kubectl get nodes
           cd tests && touch tests-${{ steps.get_cluster.outputs.cluster }}.xml
           pip install -r requirements.txt
