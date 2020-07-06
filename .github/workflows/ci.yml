@@ -153,7 +153,7 @@ jobs:
         run: docker build -t ${{ matrix.image }}:${{ github.sha }} --target ${{ matrix.target }} -f ${{ matrix.dockerfile }} ${{ matrix.path }}
       - name: Deploy Kubernetes
         run: |
-          kind create cluster --name ${{ github.run_id }} --kubeconfig kube-${{ github.run_id }} --wait 1m
+          kind create cluster --name ${{ github.run_id }} --wait 1m
       - name: Cluster IP
         id: get_cluster
         run: |
@@ -185,7 +185,7 @@ jobs:
         run: |
           python --version
           cat kube-${{ github.run_id }}
-          kubectl get nodes --kubeconfig kube-${{ github.run_id }}
+          kubectl get nodes
           cd tests && touch tests-${{ steps.get_cluster.outputs.cluster }}.xml
           pip install -r requirements.txt
           python -m pytest \
